@@ -1,6 +1,6 @@
 <!DOCTYPE airframe SYSTEM "../airframe.dtd">
 
-<airframe name="bebop_avoider">
+<airframe name="bebop_avoider_optic_flow">
   <description>MAVLAB Course TUDelft
   </description>
 
@@ -9,27 +9,12 @@
       <define name="VIDEO_CAPTURE_PATH" value="/data/ftp/internal_000/images"/>
       <define name="FILE_LOGGER_PATH" value="/data/ftp/internal_000/log"/>
       <define name="MT9V117_TARGET_FPS" value="20"/>
-      
-      <!-- Detect orange -->
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="40"/>
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="145"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="65"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="140"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="160"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="225"/>
     </target>
     <target name="nps" board="pc">
       <module name="fdm" type="gazebo"/>
       <define name="VIDEO_CAPTURE_PATH" value="/tmp/paparazzi/images"/>
       <define name="FILE_LOGGER_PATH" value="/tmp/paparazzi/log"/>
       
-      <!-- Detect orange -->
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="41"/>
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="183"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="53"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="121"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="134"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="249"/>
     </target>
     
     <define name="ARRIVED_AT_WAYPOINT" value="0.5"/><!-- Detect arrival at waypoint when within 0.5m -->
@@ -61,17 +46,35 @@
       <define name="VIDEO_CAPTURE_CAMERA" value="front_camera"/>
       <define name="VIDEO_CAPTURE_FPS" value="10"/>
     </module>
-    <module name="cv_detect_color_object">
-      <define name="COLOR_OBJECT_DETECTOR_CAMERA1" value="front_camera"/>
-      <define name="COLOR_OBJECT_DETECTOR_FPS1" value="0"/>
-      <define name="COLOR_OBJECT_DETECTOR_DRAW1" value="1"/>
+    <module name="cv_opticflow">
+      <define name="OPTICFLOW_CAMERA" value="bottom_camera"/>
+      <define name="OPTICFLOW_DEROTATION_CORRECTION_FACTOR_X" value="0.8"/> <!--Obtained from a linefit-->
+      <define name="OPTICFLOW_DEROTATION_CORRECTION_FACTOR_Y" value="0.85"/> <!--Obtained from a linefit-->
+      <configure name="OPTICFLOW_MAX_TRACK_CORNERS" value="20"/>
+      <define name="OPTICFLOW_FEATURE_MANAGEMENT" value="0"/>
+      <define name="OPTICFLOW_FPS" value="60"/>
+      <define name="OPTICFLOW_PYRAMID_LEVEL" value="0"/>
+      <define name="OPTICFLOW_SHOW_FLOW" value="0"/>
+
+      <define name="OPTICFLOW_CAMERA2" value="front_camera"/>
+      <define name="OPTICFLOW_DEROTATION_CORRECTION_FACTOR_X_CAMERA2" value="0.8"/> <!--Obtained from a linefit-->
+      <define name="OPTICFLOW_DEROTATION_CORRECTION_FACTOR_Y_CAMERA2" value="0.85"/> <!--Obtained from a linefit-->
+      <configure name="OPTICFLOW_MAX_TRACK_CORNERS_CAMERA2" value="30"/>
+      <define name="OPTICFLOW_FEATURE_MANAGEMENT_CAMERA2" value="0"/>
+      <define name="OPTICFLOW_FPS_CAMERA2" value="20"/>
+      <define name="OPTICFLOW_PYRAMID_LEVEL_CAMERA2" value="0"/>
+      <define name="OPTICFLOW_SHOW_FLOW_CAMERA2" value="0"/>
     </module>
     <module name="video_rtp_stream">
-      <define name="VIEWVIDEO_CAMERA" value="front_camera"/>
-      <define name="VIEWVIDEO_CAMERA2" value="bottom_camera"/>
+      <define name="VIEWVIDEO_CAMERA" value="bottom_camera"/>
+      <define name="VIEWVIDEO_CAMERA2" value="front_camera"/>
       <define name="VIEWVIDEO_DOWNSIZE_FACTOR" value="1"/>
       <define name="VIEWVIDEO_QUALITY_FACTOR" value="40"/>
     </module>
+
+    <!--Control module-->
+    <module name="optical_flow_landing.xml"/>
+    
   </firmware>
 
   <commands>
