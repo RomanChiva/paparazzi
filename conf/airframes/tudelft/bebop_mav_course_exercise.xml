@@ -37,9 +37,9 @@
     <module name="logger_file"/>
 
     <!-- Video/Camera modules -->
-    <module name="bebop_cam"/>
-      <define name = "MT9F002_TARGET_FPS" value = "30"/>
-      <deifne name = "MT9F002_RESOLUTION" value = "1"/>
+    <module name="bebop_cam">
+      <define name="MT9F002_TARGET_FPS" value="30"/>
+      <define name="MT9F002_RESOLUTION" value="1"/>
     </module>
     <!--module name="bebop_ae_awb">
       <define name="CV_AE_AWB_AV" value="1" />
@@ -49,6 +49,7 @@
       <define name="VIDEO_CAPTURE_CAMERA" value="front_camera"/>
       <define name="VIDEO_CAPTURE_FPS" value="10"/>
     </module>
+
     <module name="cv_opticflow">
       <define name="OPTICFLOW_CAMERA" value="front_camera"/>
       <define name="OPTICFLOW_DEROTATION_CORRECTION_FACTOR_X" value="0.8"/> <!--Obtained from a linefit-->
@@ -58,8 +59,8 @@
       <define name="OPTICFLOW_FPS" value="30"/>
       <define name="OPTICFLOW_PYRAMID_LEVEL" value="0"/>
       <define name="OPTICFLOW_SHOW_FLOW" value="0"/>
-
     </module>
+
     <module name="video_rtp_stream">
       <define name="VIEWVIDEO_CAMERA" value="front_camera"/>
       <define name="VIEWVIDEO_DOWNSIZE_FACTOR" value="1"/>
