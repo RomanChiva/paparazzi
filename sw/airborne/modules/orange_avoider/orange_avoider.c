@@ -19,6 +19,7 @@
 
 #include "modules/orange_avoider/orange_avoider.h"
 #include "firmwares/rotorcraft/navigation.h"
+#include "firmwares/rotorcraft/stabilization.h"
 #include "generated/airframe.h"
 #include "state.h"
 #include "modules/core/abi.h"
@@ -30,12 +31,23 @@
 
 #define ORANGE_AVOIDER_VERBOSE TRUE
 
+#ifndef OFL_OPTICAL_FLOW_ID
+#define OFL_OPTICAL_FLOW_ID ABI_BROADCAST
+#endif
+PRINT_CONFIG_VAR(OFL_OPTICAL_FLOW_ID)
+
 #define PRINT(string,...) fprintf(stderr, "[orange_avoider->%s()] " string,__FUNCTION__ , ##__VA_ARGS__)
 #if ORANGE_AVOIDER_VERBOSE
 #define VERBOSE_PRINT PRINT
 #else
 #define VERBOSE_PRINT(...)
 #endif
+
+float divergence_vision;
+float divergence_vision_dt;
+float vision_time;
+
+
 
 static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
 static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
@@ -52,6 +64,7 @@ enum navigation_state_t {
 
 // define settings
 float oa_color_count_frac = 0.18f;
+float div_thr = 0.1f;
 
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
@@ -73,6 +86,18 @@ const int16_t max_trajectory_confidence = 5; // number of consecutive negative o
 #define ORANGE_AVOIDER_VISUAL_DETECTION_ID ABI_BROADCAST
 #endif
 static abi_event color_detection_ev;
+static abi_event optical_flow_ev;
+
+// Reading from "sensors":
+
+void vertical_ctrl_optical_flow_cb(uint8_t sender_id UNUSED, uint32_t stamp,
+                                   int32_t flow_x UNUSED, int32_t flow_y UNUSED,
+                                   int32_t flow_der_x UNUSED, int32_t flow_der_y UNUSED, float quality UNUSED, float size_divergence)
+{
+  divergence_vision = size_divergence;
+  vision_time = ((float)stamp) / 1e6;
+}
+
 static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
                                int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
@@ -87,11 +112,14 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
 void orange_avoider_init(void)
 {
   // Initialise random values
+  divergence_vision = 0.;
+  divergence_vision_dt = 0.;
+  
   srand(time(NULL));
   chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
-  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+  AbiBindMsgOPTICAL_FLOW(OFL_OPTICAL_FLOW_ID, &optical_flow_ev, vertical_ctrl_optical_flow_cb);
 }
 
 /*
@@ -127,7 +155,7 @@ void orange_avoider_periodic(void)
       moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (obstacle_free_confidence == 0){
+      } else if (divergence_vision > div_thr){
         navigation_state = OBSTACLE_FOUND;
       } else {
         moveWaypointForward(WP_GOAL, moveDistance);
