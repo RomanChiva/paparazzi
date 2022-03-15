@@ -38,27 +38,34 @@
 #endif
 
 static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
+static uint8_t moveWaypointBackward(uint8_t waypoint, float distanceMeters);
 static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
+static uint8_t calculateBackwards(struct EnuCoor_i *new_coor, float distanceMeters);
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
 static uint8_t increase_nav_heading(float incrementDegrees);
 static uint8_t chooseRandomIncrementAvoidance(void);
 
 enum navigation_state_t {
-  SAFE,
+  SAFE1,
+  SAFE2,
   OBSTACLE_FOUND,
   SEARCH_FOR_SAFE_HEADING,
+  TURN180,
   OUT_OF_BOUNDS
 };
 
 // define settings
 float oa_color_count_frac = 0.18f;
-// TEST
+
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
 int32_t color_count = 0;                // orange color count from color filter for obstacle detection
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
 float heading_increment = 5.f;          // heading angle increment [deg]
 float maxDistance = 2.25;               // max waypoint displacement [m]
+float Total_Distance_before_turn = 0.f;
+float Total_Distance_back = 0.f;
+float next_heading = 0.f;
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
@@ -100,7 +107,7 @@ void orange_avoider_init(void)
 void orange_avoider_periodic(void)
 {
   // only evaluate our state machine if we are flying
-  if(!autopilot_in_flight()){
+  while(!autopilot_in_flight()){ //change if to while
     return;
   }
 
@@ -121,28 +128,59 @@ void orange_avoider_periodic(void)
 
   float moveDistance = fminf(maxDistance, 0.2f * obstacle_free_confidence);
 
+ // current state self added
+//  int32_t curstatex = stateGetPositionEnu_i()->x; //added
+//  int32_t curstatey = stateGetPositionEnu_i()->y;
+//  VERBOSE_PRINT("loop starts with x: %f  y: %f \n",curstatex,curstatey);
   switch (navigation_state){
-    case SAFE:
+    case SAFE1:
       // Move waypoint forward
       moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
+      Total_Distance_before_turn+=1.5f*moveDistance;
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
       } else if (obstacle_free_confidence == 0){
         navigation_state = OBSTACLE_FOUND;
       } else {
         moveWaypointForward(WP_GOAL, moveDistance);
-      }
+        //Total_Distance_before_turn+=moveDistance;
 
+      }
+      VERBOSE_PRINT("Moved %f before turn.\n",Total_Distance_before_turn);
+
+      break;
+    case SAFE2:
+      // Move waypoint backrward
+      moveWaypointBackward(WP_TRAJECTORY, 0.5f * Total_Distance_before_turn);
+      moveWaypointBackward(WP_GOAL, 0.5f * Total_Distance_before_turn);
+      //Total_Distance_back += 1.5f * moveDistance;
+      //moveWaypointForward(WP_TRAJECTORY, 0.5f * (0-Total_Distance_before_turn));
+//      if (Total_Distance_back>0.5*Total_Distance_before_turn){
+//        Total_Distance_before_turn=0;
+//        Total_Distance_back = 0;
+//        navigation_state = SEARCH_FOR_SAFE_HEADING;
+//        VERBOSE_PRINT("Moved TO HOME BASE.\n");
+//      }
+      Total_Distance_before_turn=0;
+      navigation_state = SEARCH_FOR_SAFE_HEADING;
+      VERBOSE_PRINT("Current state: %d", navigation_state);
       break;
     case OBSTACLE_FOUND:
       // stop
       waypoint_move_here_2d(WP_GOAL);
       waypoint_move_here_2d(WP_TRAJECTORY);
 
-      // randomly select new search direction
-      chooseRandomIncrementAvoidance();
+      //reset total moving distance
+      VERBOSE_PRINT("*********Turing after %f due to OB and reset total distance.\n",Total_Distance_before_turn);
+      //Total_Distance_before_turn=0;
 
-      navigation_state = SEARCH_FOR_SAFE_HEADING;
+
+      // randomly select new search direction
+      //chooseRandomIncrementAvoidance();
+
+      navigation_state = SAFE2;
+      VERBOSE_PRINT("From OB, Enter SAFE2 state");
+
 
       break;
     case SEARCH_FOR_SAFE_HEADING:
@@ -150,23 +188,55 @@ void orange_avoider_periodic(void)
 
       // make sure we have a couple of good readings before declaring the way safe
       if (obstacle_free_confidence >= 2){
-        navigation_state = SAFE;
+        navigation_state = SAFE1;
       }
+      VERBOSE_PRINT("From SH, Enter SAFE1 state");
+      break;
+    case TURN180:
+      increase_nav_heading(180.f);
+      VERBOSE_PRINT("Finish 180 turn");
+      navigation_state = SAFE2;
+      VERBOSE_PRINT("Enter SAFE2 state");
       break;
     case OUT_OF_BOUNDS:
-      increase_nav_heading(heading_increment);
-      moveWaypointForward(WP_TRAJECTORY, 1.5f);
+      // stop
+      waypoint_move_here_2d(WP_GOAL);
+      waypoint_move_here_2d(WP_TRAJECTORY);
 
-      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
-        // add offset to head back into arena
-        increase_nav_heading(heading_increment);
+      VERBOSE_PRINT("Out of BOund\n");
+      //VERBOSE_PRINT("*********Turing after %f due to WALL and reset total distance.\n",Total_Distance_before_turn);
+      navigation_state = SAFE2;
+      VERBOSE_PRINT("From OUT OF BOUND, Enter SAFE2 state");
+      // large turns
 
-        // reset safe counter
-        obstacle_free_confidence = 0;
 
-        // ensure direction is safe before continuing
-        navigation_state = SEARCH_FOR_SAFE_HEADING;
-      }
+
+//      VERBOSE_PRINT("current_heading: %f.\n",DegOfRad(stateGetNedToBodyEulers_f()->psi));
+//      next_heading = (stateGetNedToBodyEulers_f()->psi+ RadOfDeg(180));
+//      FLOAT_ANGLE_NORMALIZE(next_heading)
+//      while (abs(next_heading-DegOfRad(stateGetNedToBodyEulers_f()->psi))>5.0){
+//    	  increase_nav_heading(5.f);
+//    	  VERBOSE_PRINT("goal_heading: %f.\n",next_heading);
+//    	  VERBOSE_PRINT("current_heading: %f.\n",DegOfRad(stateGetNedToBodyEulers_f()->psi));
+//
+//      }
+//      VERBOSE_PRINT("Finish Turning.\n");
+//      moveWaypointForward(WP_TRAJECTORY, 0.5f * Total_Distance_before_turn);
+//      VERBOSE_PRINT("Went to half way back.\n");
+//      VERBOSE_PRINT("Search heading.\n");
+//      //moveWaypointForward(WP_TRAJECTORY, 1.5f);
+//      Total_Distance_before_turn=0;
+//      navigation_state = SEARCH_FOR_SAFE_HEADING;
+//      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+//        // add offset to head back into arena
+//        increase_nav_heading(heading_increment);
+//
+//        // reset safe counter
+//        obstacle_free_confidence = 0;
+//
+//        // ensure direction is safe before continuing
+//        navigation_state = SEARCH_FOR_SAFE_HEADING;
+//      }
       break;
     default:
       break;
@@ -204,6 +274,17 @@ uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
 }
 
 /*
+ * Calculates coordinates of distance backward and sets waypoint 'waypoint' to those coordinates
+ */
+uint8_t moveWaypointBackward(uint8_t waypoint, float distanceMeters)
+{
+  struct EnuCoor_i new_coor;
+  calculateBackwards(&new_coor, distanceMeters);
+  moveWaypoint(waypoint, &new_coor);
+  return false;
+}
+
+/*
  * Calculates coordinates of a distance of 'distanceMeters' forward w.r.t. current position and heading
  */
 uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
@@ -219,6 +300,21 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
   return false;
 }
 
+/*
+ * Calculates coordinates of a distance of 'distanceMeters' forward w.r.t. current position and heading
+ */
+uint8_t calculateBackwards(struct EnuCoor_i *new_coor, float distanceMeters)
+{
+  float heading  = stateGetNedToBodyEulers_f()->psi;
+
+  // Now determine where to place the waypoint you want to go to
+  new_coor->x = stateGetPositionEnu_i()->x - POS_BFP_OF_REAL(sinf(heading) * (distanceMeters));
+  new_coor->y = stateGetPositionEnu_i()->y - POS_BFP_OF_REAL(cosf(heading) * (distanceMeters));
+  VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,
+                POS_FLOAT_OF_BFP(new_coor->x), POS_FLOAT_OF_BFP(new_coor->y),
+                stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y, DegOfRad(heading));
+  return false;
+}
 /*
  * Sets waypoint 'waypoint' to the coordinates of 'new_coor'
  */
