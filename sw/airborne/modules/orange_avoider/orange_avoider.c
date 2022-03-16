@@ -230,10 +230,11 @@ void orange_avoider_periodic(void)
       VERBOSE_PRINT("From SH, Enter SAFE1 state");
       break;
     case TURN180:
-      increase_nav_heading(180.f);
+      increase_nav_heading(90.f);
+      increase_nav_heading(90.f);
       VERBOSE_PRINT("Finish 180 turn");
-      navigation_state = SAFE2;
-      VERBOSE_PRINT("Enter SAFE2 state");
+      navigation_state = SAFE1;
+      VERBOSE_PRINT("Enter SAFE1 state");
       break;
     case OUT_OF_BOUNDS:
       // stop
@@ -242,7 +243,7 @@ void orange_avoider_periodic(void)
 
       VERBOSE_PRINT("Out of BOund\n");
       //VERBOSE_PRINT("*********Turing after %f due to WALL and reset total distance.\n",Total_Distance_before_turn);
-      navigation_state = SAFE2;
+      navigation_state = TURN180;
       VERBOSE_PRINT("From OUT OF BOUND, Enter SAFE2 state");
       // large turns
 
