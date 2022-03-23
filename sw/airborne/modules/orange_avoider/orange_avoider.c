@@ -20,6 +20,7 @@
 #include "modules/orange_avoider/orange_avoider.h"
 #include "firmwares/rotorcraft/navigation.h"
 #include "firmwares/rotorcraft/stabilization.h"
+#include "modules/datalink/telemetry.h"
 #include "generated/airframe.h"
 #include "state.h"
 #include "modules/core/abi.h"
@@ -43,9 +44,6 @@ PRINT_CONFIG_VAR(OFL_OPTICAL_FLOW_ID)
 #define VERBOSE_PRINT(...)
 #endif
 
-float divergence_vision;
-float divergence_vision_dt;
-float vision_time;
 
 
 
@@ -69,7 +67,11 @@ enum navigation_state_t {
 
 // define settings
 float oa_color_count_frac = 0.18f;
-float div_thr = 0.01f;
+float div_thr = 0.1f;
+float divergence = 0;
+float divergence_vision;
+float vision_time, vision_time_prev;
+
 
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
@@ -106,34 +108,33 @@ void vertical_ctrl_optical_flow_cb(uint8_t sender_id UNUSED, uint32_t stamp,
   vision_time = ((float)stamp) / 1e6;
 }
 
-static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
-                               int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
-                               int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
-                               int32_t quality, int16_t __attribute__((unused)) extra)
+static void send_divergence(struct transport_tx *trans, struct link_device *dev)
 {
-  color_count = quality;
+  pprz_msg_send_DIVERGENCE(trans, dev, AC_ID,
+                           &divergence, &divergence_vision, &div_thr,
+                           &vision_time, &vision_time_prev, &maxDistance, &next_heading);
 }
 
 
-/*
+/*n
  * Initialisation function, setting the colour filter, random seed and heading_increment
  */
 void orange_avoider_init(void)
 {
   // Initialise random values
   divergence_vision = 0.;
-  divergence_vision_dt = 0.;
+
   
   srand(time(NULL));
   chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
-
   
 
   AbiBindMsgOPTICAL_FLOW(OFL_OPTICAL_FLOW_ID, &optical_flow_ev, vertical_ctrl_optical_flow_cb);
 
+  register_periodic_telemetry(DefaultPeriodic, PPRZ_MSG_ID_DIVERGENCE, send_divergence);
 
 }
 
@@ -146,28 +147,16 @@ void orange_avoider_periodic(void)
   if(!autopilot_in_flight()){
     return;
   }
-
-  // // compute current color thresholds
-  // int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
-
-  VERBOSE_PRINT(" state: %d div : %f div_thr: %f \n", navigation_state, divergence_vision, div_thr);
-
-  // // update our safe confidence using color threshold
-  // if(color_count < color_count_threshold){
-  //   obstacle_free_confidence++;
-  // } else {
-  //   obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
-  // }
-
-  // bound obstacle_free_confidence
-  // ound(obstacle_free_confidence, 0, max_trajectory_confidence);
+  float dt = vision_time - vision_time_prev;
+ 
+  VERBOSE_PRINT(" state: %d div : %f div_thr: %f \n", navigation_state, div_thr);
 
   float moveDistance = maxDistance;
+  float div_factor = 1.28;
+  float new_divergence = (divergence_vision*div_factor)/dt;
+  //lowpass
+  divergence += (new_divergence - divergence)*0.7;
 
- // current state self added
-//  int32_t curstatex = stateGetPositionEnu_i()->x; //added
-//  int32_t curstatey = stateGetPositionEnu_i()->y;
-//  VERBOSE_PRINT("loop starts with x: %f  y: %f \n",curstatex,curstatey);
   switch (navigation_state){
     case SAFE1:
       // Move waypoint forward
@@ -175,7 +164,7 @@ void orange_avoider_periodic(void)
       Total_Distance_before_turn+=1.5f*moveDistance;
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (divergence_vision > div_thr){
+      } else if (divergence > div_thr){
         VERBOSE_PRINT("found /n");
         navigation_state = OBSTACLE_FOUND;
       } else {
@@ -190,14 +179,7 @@ void orange_avoider_periodic(void)
       // Move waypoint backrward
       moveWaypointBackward(WP_TRAJECTORY, 0.5f * Total_Distance_before_turn);
       moveWaypointBackward(WP_GOAL, 0.5f * Total_Distance_before_turn);
-      //Total_Distance_back += 1.5f * moveDistance;
-      //moveWaypointForward(WP_TRAJECTORY, 0.5f * (0-Total_Distance_before_turn));
-//      if (Total_Distance_back>0.5*Total_Distance_before_turn){
-//        Total_Distance_before_turn=0;
-//        Total_Distance_back = 0;
-//        navigation_state = SEARCH_FOR_SAFE_HEADING;
-//        VERBOSE_PRINT("Moved TO HOME BASE.\n");
-//      }
+
       Total_Distance_before_turn=0;
       navigation_state = SEARCH_FOR_SAFE_HEADING;
       VERBOSE_PRINT("Current state: %d", navigation_state);
@@ -247,38 +229,11 @@ void orange_avoider_periodic(void)
       VERBOSE_PRINT("From OUT OF BOUND, Enter SAFE2 state");
       // large turns
 
-
-
-//      VERBOSE_PRINT("current_heading: %f.\n",DegOfRad(stateGetNedToBodyEulers_f()->psi));
-//      next_heading = (stateGetNedToBodyEulers_f()->psi+ RadOfDeg(180));
-//      FLOAT_ANGLE_NORMALIZE(next_heading)
-//      while (abs(next_heading-DegOfRad(stateGetNedToBodyEulers_f()->psi))>5.0){
-//    	  increase_nav_heading(5.f);
-//    	  VERBOSE_PRINT("goal_heading: %f.\n",next_heading);
-//    	  VERBOSE_PRINT("current_heading: %f.\n",DegOfRad(stateGetNedToBodyEulers_f()->psi));
-//
-//      }
-//      VERBOSE_PRINT("Finish Turning.\n");
-//      moveWaypointForward(WP_TRAJECTORY, 0.5f * Total_Distance_before_turn);
-//      VERBOSE_PRINT("Went to half way back.\n");
-//      VERBOSE_PRINT("Search heading.\n");
-//      //moveWaypointForward(WP_TRAJECTORY, 1.5f);
-//      Total_Distance_before_turn=0;
-//      navigation_state = SEARCH_FOR_SAFE_HEADING;
-//      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
-//        // add offset to head back into arena
-//        increase_nav_heading(heading_increment);
-//
-//        // reset safe counter
-//        obstacle_free_confidence = 0;
-//
-//        // ensure direction is safe before continuing
-//        navigation_state = SEARCH_FOR_SAFE_HEADING;
-//      }
       break;
     default:
       break;
   }
+    vision_time_prev = vision_time;
   return;
 }
 
