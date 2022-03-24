@@ -152,16 +152,17 @@ void orange_avoider_periodic(void)
 
   //VERBOSE_PRINT(" state: %d div : %f div_thr: %f \n", navigation_state, divergence_vision, div_thr);
   VERBOSE_PRINT(" color_count: %f color_threshold : %f \n", color_count, color_count_threshold);
+  VERBOSE_PRINT(" w:  %f, h : %f \n", front_camera.output_size.w, front_camera.output_size.h);
 
   // // update our safe confidence using color threshold
-  // if(color_count < color_count_threshold){
-  //    obstacle_free_confidence++;
-  //  } else {
-  //    obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
-  //  }
+  if(color_count < color_count_threshold){
+      obstacle_free_confidence++;
+    } else {
+      obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
+    }
 
   //  // bound obstacle_free_confidence
-  //  Bound(obstacle_free_confidence, 0, max_trajectory_confidence); 
+    Bound(obstacle_free_confidence, 0, max_trajectory_confidence); 
 
   float moveDistance = maxDistance;
 
@@ -176,7 +177,7 @@ void orange_avoider_periodic(void)
       Total_Distance_before_turn+=1.5f*moveDistance;
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (color_count > color_count_threshold){     // divergence_vision > div_thr
+      } else if (obstacle_free_confidence = 0){     // divergence_vision > div_thr
         VERBOSE_PRINT("PORCAMADONNAAAAAAAAAAAAAAAAAAAA found /n");
         navigation_state = OBSTACLE_FOUND;
       } else {

@@ -83,3 +83,7 @@ void colorfilter_init(void)
 {
   cv_add_to_device(&COLORFILTER_CAMERA, colorfilter_func, COLORFILTER_FPS, 0);
 }
+
+
+
+

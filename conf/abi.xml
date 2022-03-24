@@ -67,6 +67,10 @@
       <field name="size_divergence" type="float">Divergence as determined with the size method (in 1/seconds) with LK, and Divergence (1/seconds) itself with EF</field>
     </message>
 
+    <message name="OPTICAL_FLOW_YOUSSEF" id="69">
+      <field name="size_divergence" type="float">Divergence as determined with the size method (in 1/seconds) with LK, and Divergence (1/seconds) itself with EF</field>
+    </message>
+
     <message name="VELOCITY_ESTIMATE" id="12">
       <field name="stamp" type="uint32_t" unit="us"/>
       <field name="x" type="float" unit="m/s"/>

@@ -69,6 +69,10 @@ void mav_exercise_init(void) {
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
 }
 
+void mav_exercise_opticalflow(void) {
+  // get divergence value as ABI message
+  AbiBindMsgOPTICAL_FLOW_YOUSSEF(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+}
 void mav_exercise_periodic(void) {
   // only evaluate our state machine if we are flying
   if (!autopilot_in_flight()) {
