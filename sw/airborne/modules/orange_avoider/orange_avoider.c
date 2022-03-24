@@ -77,7 +77,7 @@ float vision_time, vision_time_prev;
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
 int32_t color_count = 0;                // orange color count from color filter for obstacle detection
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
-float heading_increment = 5.f;          // heading angle increment [deg]
+float heading_increment = 30.f;          // heading angle increment [deg]
 float maxDistance = 1.25;               // max waypoint displacement [m]
 float Total_Distance_before_turn = 0.f;
 float Total_Distance_back = 0.f;
@@ -161,7 +161,7 @@ void orange_avoider_periodic(void)
     case SAFE1:
       // Move waypoint forward
       moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
-      Total_Distance_before_turn+=1.5f*moveDistance;
+      //Total_Distance_before_turn+=1.5f*moveDistance;
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
       } else if (divergence > div_thr){
@@ -169,7 +169,7 @@ void orange_avoider_periodic(void)
         navigation_state = OBSTACLE_FOUND;
       } else {
         moveWaypointForward(WP_GOAL, moveDistance);
-        //Total_Distance_before_turn+=moveDistance;
+        Total_Distance_before_turn+=moveDistance;
         VERBOSE_PRINT("Moved %f before turn.\n",Total_Distance_before_turn);
       }
       
@@ -178,8 +178,22 @@ void orange_avoider_periodic(void)
     case SAFE2:
       // Move waypoint backrward
       moveWaypointBackward(WP_TRAJECTORY, 0.5f * Total_Distance_before_turn);
-      moveWaypointBackward(WP_GOAL, 0.5f * Total_Distance_before_turn);
-
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+          waypoint_move_here_2d(WP_GOAL);
+          waypoint_move_here_2d(WP_TRAJECTORY);
+          navigation_state = SEARCH_FOR_SAFE_HEADING;
+      }
+      else {
+          moveWaypointBackward(WP_GOAL, 0.5f * Total_Distance_before_turn);
+      }
+      //Total_Distance_back += 1.5f * moveDistance;
+      //moveWaypointForward(WP_TRAJECTORY, 0.5f * (0-Total_Distance_before_turn));
+//      if (Total_Distance_back>0.5*Total_Distance_before_turn){
+//        Total_Distance_before_turn=0;
+//        Total_Distance_back = 0;
+//        navigation_state = SEARCH_FOR_SAFE_HEADING;
+//        VERBOSE_PRINT("Moved TO HOME BASE.\n");
+//      }
       Total_Distance_before_turn=0;
       navigation_state = SEARCH_FOR_SAFE_HEADING;
       VERBOSE_PRINT("Current state: %d", navigation_state);
