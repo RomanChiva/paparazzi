@@ -94,17 +94,17 @@ const int16_t max_trajectory_confidence = 5; // number of consecutive negative o
 #define ORANGE_AVOIDER_VISUAL_DETECTION_ID ABI_BROADCAST
 #endif
 static abi_event color_detection_ev;
-static abi_event optical_flow_ev;
+// static abi_event optical_flow_ev;
 
-// Reading from "sensors":
+// // Reading from "sensors":
 
-void vertical_ctrl_optical_flow_cb(uint8_t sender_id UNUSED, uint32_t stamp,
-                                   int32_t flow_x UNUSED, int32_t flow_y UNUSED,
-                                   int32_t flow_der_x UNUSED, int32_t flow_der_y UNUSED, float quality UNUSED, float size_divergence)
-{
-  divergence_vision = size_divergence;
-  vision_time = ((float)stamp) / 1e6;
-}
+// void vertical_ctrl_optical_flow_cb(uint8_t sender_id UNUSED, uint32_t stamp,
+//                                    int32_t flow_x UNUSED, int32_t flow_y UNUSED,
+//                                    int32_t flow_der_x UNUSED, int32_t flow_der_y UNUSED, float quality UNUSED, float size_divergence)
+// {
+//   divergence_vision = size_divergence;
+//   vision_time = ((float)stamp) / 1e6;
+// }
 
 static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
@@ -128,11 +128,11 @@ void orange_avoider_init(void)
   chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
- // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
 
   
 
-  AbiBindMsgOPTICAL_FLOW(OFL_OPTICAL_FLOW_ID, &optical_flow_ev, vertical_ctrl_optical_flow_cb);
+  //AbiBindMsgOPTICAL_FLOW(OFL_OPTICAL_FLOW_ID, &optical_flow_ev, vertical_ctrl_optical_flow_cb);
 
 
 }
@@ -148,19 +148,20 @@ void orange_avoider_periodic(void)
   }
 
   // // compute current color thresholds
-  // int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
+  int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
 
-  VERBOSE_PRINT(" state: %d div : %f div_thr: %f \n", navigation_state, divergence_vision, div_thr);
+  //VERBOSE_PRINT(" state: %d div : %f div_thr: %f \n", navigation_state, divergence_vision, div_thr);
+  VERBOSE_PRINT(" color_count: %f color_threshold : %f \n", color_count, color_count_threshold);
 
   // // update our safe confidence using color threshold
   // if(color_count < color_count_threshold){
-  //   obstacle_free_confidence++;
-  // } else {
-  //   obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
-  // }
+  //    obstacle_free_confidence++;
+  //  } else {
+  //    obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
+  //  }
 
-  // bound obstacle_free_confidence
-  // ound(obstacle_free_confidence, 0, max_trajectory_confidence);
+  //  // bound obstacle_free_confidence
+  //  Bound(obstacle_free_confidence, 0, max_trajectory_confidence); 
 
   float moveDistance = maxDistance;
 
@@ -175,8 +176,8 @@ void orange_avoider_periodic(void)
       Total_Distance_before_turn+=1.5f*moveDistance;
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (divergence_vision > div_thr){
-        VERBOSE_PRINT("found /n");
+      } else if (color_count > color_count_threshold){     // divergence_vision > div_thr
+        VERBOSE_PRINT("PORCAMADONNAAAAAAAAAAAAAAAAAAAA found /n");
         navigation_state = OBSTACLE_FOUND;
       } else {
         moveWaypointForward(WP_GOAL, moveDistance);
@@ -335,6 +336,7 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
   VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,	
                 POS_FLOAT_OF_BFP(new_coor->x), POS_FLOAT_OF_BFP(new_coor->y),
                 stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y, DegOfRad(heading));
+  
   return false;
 }
 

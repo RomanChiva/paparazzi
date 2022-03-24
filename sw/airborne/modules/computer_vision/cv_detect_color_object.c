@@ -217,7 +217,7 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
   uint8_t *buffer = img->buf;
 
   // Go through all the pixels
-  for (uint16_t y = 0; y < img->h; y++) {
+  for (uint16_t y = h/2 ; y < img-> h; y++) {
     for (uint16_t x = 0; x < img->w; x ++) {
       // Check if the color is inside the specified values
       uint8_t *yp, *up, *vp;
@@ -234,9 +234,9 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
         vp = &buffer[y * 2 * img->w + 2 * x];      // V
         yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
       }
-      if ( (*yp >= lum_min) && (*yp <= lum_max) &&
-           (*up >= cb_min ) && (*up <= cb_max ) &&
-           (*vp >= cr_min ) && (*vp <= cr_max )) {
+      if ( (*yp <= lum_min) && (*yp >= lum_max) &&
+           (*up <= cb_min ) && (*up >= cb_max ) &&
+           (*vp <= cr_min ) && (*vp >= cr_max )) {
         cnt ++;
         tot_x += x;
         tot_y += y;
