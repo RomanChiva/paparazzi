@@ -1,0 +1,28 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="opticflow_lowpass">
+  <doc>
+    <description>
+This is a module developed by Group 5 of the MAV course and it uses the divergence size to detect obstacles and based on
+a threshold it perform certain mavounvers. The divergence size is processed and filtered.
+
+The setting that can be changes if the divergence threshold. 
+    </description>
+  </doc>
+    <settings>
+    <dl_settings>
+      <dl_settings name="Divergence_avoider">
+         <dl_setting var="div_thr" min="0" step="0.001" max="0.5"/>
+      </dl_settings>
+    </dl_settings>
+  </settings>
+  
+  <header>
+    <file name="opticflow_lowpass.h"/>
+  </header>
+  <init fun="opticflow_lowpass_init()"/>
+  <periodic fun="opticflow_lowpass_periodic()" freq="4"/>
+  <makefile target="ap|nps">
+    <file name="opticflow_lowpass.c"/>
+  </makefile>
+</module>
