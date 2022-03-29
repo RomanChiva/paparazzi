@@ -1,7 +1,11 @@
 /**
  * @file "modules/opticflow_lowpass/opticflow_lowpass.c"
  * @author Group 5
- * Avoid Obstacles with optic flow
+ * Avoid Obstacles with optic flow. The model gets the divegence size from the cv_opticflow module and based of a certain threshold
+ *  it makes the drone perform certain manouvers. The main obstacle mavouver is a turn of 30 deg while is the drone goes out of bounds 
+ * the mavounver will be a 180 deg turn. This module can be expanded with any parameter from the optic flow module. 
+ * 
+ * The documentation for this module follows the report written by group 5
  */
 
 #include "modules/opticflow_lowpass/opticflow_lowpass.h"
